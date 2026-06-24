@@ -123,7 +123,7 @@ docker compose restart <service>   # 重啟特定服務
 
 本資料夾使用**整合版** docker-compose.yml（所有服務寫在同一個檔案）。
 
-de-project 使用**拆開版**（每個服務一個 compose file）。兩種做法的差別：
+[de-project](https://github.com/DataEngCamp/de-project) 使用**拆開版**（每個服務一個 compose file）。兩種做法的差別：
 
 | | 整合版（本資料夾） | 拆開版（de-project） |
 |---|---|---|
