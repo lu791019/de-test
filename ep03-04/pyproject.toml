@@ -1,0 +1,11 @@
+[project]
+name = "test-ep02"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "pandas>=3.0.3",
+    "requests>=2.34.2",
+    "tqdm>=4.68.3",
+]
