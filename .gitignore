@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+*.csv
+requirements-1.txt
+.DS_Store
