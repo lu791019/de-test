@@ -172,36 +172,15 @@ docker compose version
 # Docker Compose version v2.x.x
 ```
 
-### Step 6：修復 iptables（Ubuntu 22.04+ 必要）
+### Step 6：iptables —— 預設不用碰（重要觀念）
 
-Ubuntu 22.04 以後預設使用 nftables，但 Docker 需要 iptables-legacy。**不做這步 Docker daemon 會啟動失敗，或 `docker compose up` 建立網路時報錯。**
+> **過去很多教學叫你一律把 iptables 切成 legacy。實測後確認：新版 Docker（28/29+）+ 新 kernel 用 Ubuntu 預設的 nftables 就能正常跑，不需要切。** iptables-legacy 已從「必做步驟」降級為「遇到網路錯誤時的排錯手段」。
 
-```bash
-sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
-sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-```
+iptables 是 Docker 拿來做容器網路的工具（port 映射、bridge、`docker compose` 服務互連）。Ubuntu 22.04+ 預設用 nftables 後端。
 
-⚠️ **切換後一定要重啟 Docker daemon**（實測重點）：安裝 docker-ce 時 daemon 已經以舊的 nftables 啟動了，不重啟的話 iptables chain 不會重建，之後 `docker compose up` 會報 `iptables: No chain/target/match by that name` / `DOCKER-FORWARD` 錯誤。
+**這一步什麼都不用做** —— 直接進 Step 7。只有在後面 `docker compose up` 報網路錯誤時，才回來看 [FAQ Q10 / Q14.5](#q10iptables-報-rule_append-failed) 的 legacy 排錯。
 
-```bash
-# 全新 WSL 預設沒有 systemd → 用 service（這步用這個就對了）
-sudo service docker restart
-```
-
-> 💡 systemd 預設是**關閉**的，要到後面「啟用 systemd」那節自己開。如果你**還沒**做那節（大多數情況），這裡就用 `sudo service docker restart`。
-> 已經啟用 systemd 的話，改用 `sudo systemctl restart docker`。
-> 不確定有沒有 systemd？執行：
-> ```bash
-> systemctl list-unit-files >/dev/null 2>&1 && echo "有 systemd → 用 systemctl" || echo "沒有 → 用 service"
-> ```
-
-✅ **驗證**：
-
-```bash
-iptables --version
-# 應該看到 iptables v1.8.x (legacy)
-# 如果看到 (nf_tables) = 還沒切換成功
-```
+✅ 實測（Docker 29 / Ubuntu 22.04）：純 nftables 下 `docker run`、`docker build`、`docker network create`、`docker compose up`、`-p` port 映射全部正常。
 
 ### Step 7：把用戶加入 docker 群組
 
@@ -682,11 +661,13 @@ sudo dockerd --debug 2>&1 | head -50
 ```
 
 常見原因：
-1. **iptables 沒切換** → 見 Step 6
-2. **systemd 已啟用但用了 service** → 改用 `sudo systemctl start docker`
+1. **systemd 已啟用但用了 service** → 改用 `sudo systemctl start docker`
+2. **iptables 後端不相容**（舊 kernel）→ 見 Q10
 3. **Docker 被另一個 process 鎖住** → `sudo kill $(cat /var/run/docker.pid)` 然後重啟
 
-### Q10：iptables 報 `RULE_APPEND failed`
+### Q10：iptables 報 `RULE_APPEND failed`（舊 kernel 才會遇到）
+
+> 多數新環境（Docker 28/29+ + 新 kernel）**不會**遇到這題，nftables 預設就能跑。這題是舊 kernel / 舊 Docker 才需要切 legacy。
 
 **完整錯誤訊息**：
 
@@ -694,21 +675,27 @@ sudo dockerd --debug 2>&1 | head -50
 iptables v1.8.7 (nf_tables): RULE_APPEND failed (No such file or directory)
 ```
 
-**原因**：Ubuntu 22.04+ 預設用 nftables，Docker 不支援。
+**原因**：那台機器的 kernel 對 nftables 後端支援不完整，Docker 設不了網路規則。
 
-**解法**：
+**解法**：切到 legacy 後端，**切完一定要重啟 daemon**：
 
 ```bash
 sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
 sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+
+# ⚠️ 切完一定要 restart（全新 WSL 用 service）
 sudo service docker restart
+# 已啟用 systemd 才改用 sudo systemctl restart docker
 ```
+
+⚠️ **重要**：不要「裝完先用 nft 跑一陣子、中途才切 legacy」。daemon 用 nft 建好 chain 後你才切 CLI 成 legacy，兩邊會不一致，反而報 `DOCKER-FORWARD` 錯（見 Q14.5）。要切就在裝好後、還沒大量使用前切，並馬上 restart。
 
 **驗證**：
 
 ```bash
 iptables --version
-# 應該看到 (legacy)，不是 (nf_tables)
+# 切換後應該看到 (legacy)
+docker network create t && docker network rm t   # 能成功 = OK
 ```
 
 ### Q11：systemd 啟用後 `service docker start` 報錯
@@ -791,9 +778,11 @@ iptables: No chain/target/match by that name. (exit status 1)
 failed to create network xxx_default
 ```
 
-**原因**：切換 iptables-legacy（Step 6）之前，Docker daemon 已經以 nftables 啟動，iptables chain 沒有重建。`docker run hello-world`（不建網路）和 `docker build` 不受影響，但 `docker compose up` 要建 bridge 網路就會炸。
+**根本原因（實測確認）**：通常是**「中途切 iptables-legacy 造成的不一致」**。Docker daemon 已經用 nftables 建好 chain，你之後才把 iptables CLI 切成 legacy，兩邊對不上 → daemon 要加 `DOCKER-FORWARD` 規則時找不到 chain。`docker run hello-world`（不建網路）和 `docker build` 不受影響，但 `docker compose up` 要建 bridge 網路就炸。
 
-**解法**：重啟 Docker daemon 讓它重建 chain（這是實測抓到的關鍵步驟）：
+> 💡 **最好的預防：根本不要切 iptables**（見 Step 6）。新版 Docker 用 nftables 預設就能跑。實測 Docker 29 純 nft 下 compose / port 映射全部正常。
+
+**解法**：重啟 Docker daemon 讓 chain 重新一致：
 
 ```bash
 # 全新 WSL 預設用這個
@@ -803,6 +792,13 @@ sudo service docker restart
 # 重啟後重試
 docker compose up -d
 ```
+
+> 如果你之前手賤切了 legacy 又想切回乾淨的 nft 預設：
+> ```bash
+> sudo update-alternatives --set iptables /usr/sbin/iptables-nft
+> sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+> sudo service docker restart
+> ```
 
 **驗證**：
 

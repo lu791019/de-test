@@ -144,7 +144,7 @@ docker compose restart <service>   # 重啟特定服務
 | `port already in use` | `docker ps` 找到佔用的 container → `docker stop` |
 | `permission denied` | `sudo usermod -aG docker <username>` → `wsl --shutdown` 重開 |
 | build 很慢 | 第一次要下載基底 image，之後有快取會快 |
-| `docker compose up` 報 `iptables: No chain/target/match` / `DOCKER-FORWARD` | 切 iptables-legacy 後沒重啟 daemon。全新 WSL 用 `sudo service docker restart`（已啟用 systemd 才用 `sudo systemctl restart docker`）後重試 |
+| `docker compose up` 報 `iptables: No chain/target/match` / `DOCKER-FORWARD` | 多半是中途切過 iptables-legacy 造成不一致。`sudo service docker restart` 即可（新版 Docker 預設別碰 iptables）|
 | phpMyAdmin 一直 Restarting，log 顯示 `exec format error` | `phpmyadmin:5.2` 是 amd64-only。**Windows WSL 學生不受影響**；Apple Silicon Mac 把 compose 裡 `phpmyadmin:5.2` 改成 `phpmyadmin:latest`（多架構）|
 
 > 完整 Docker Engine 安裝、systemd、Mac/Colima、架構問題、課前預載清單 → 見課程的 `Docker 安裝教學手冊（Docker_Engine_vs_Desktop.md）`
