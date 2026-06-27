@@ -431,13 +431,41 @@ docker compose ps
 
 ✅ 實測 RabbitMQ 和 Flower 都 HTTP 200。
 
-### Step 5：看 log
+### Step 5：看 log + 判讀
 
 ```bash
-docker compose logs -f rabbitmq   # 看單一服務
-docker compose logs -f            # 看全部
-# Ctrl+C 離開（不會停止服務）
+docker compose logs rabbitmq       # 看單一服務（歷史 log）
+docker compose logs -f rabbitmq    # 即時跟蹤（Ctrl+C 離開，不會停服務）
+docker compose logs -f             # 看全部服務的 log
+docker compose logs --tail 20      # 只看最後 20 行
 ```
+
+**怎麼判讀 — 看什麼才算正常**：
+
+| 服務 | 正常 log（看到就 OK）| 要注意的 |
+|------|-------------------|---------|
+| rabbitmq | `Time to start RabbitMQ: xxxms` | 啟動前有 `transient_nonexcl_queues` warning → 正常（RabbitMQ 未來版本提醒，不影響）|
+| flower | `Connected to amqp://worker:**@rabbitmq:5672//` | 啟動前可能有 `Connection refused` → 正常（rabbitmq 還沒好，幾秒後會自動重連）|
+| mysql | `ready for connections. Version: '8.0.x'` | `CA certificate is self signed` / `pid-file insecure` → 正常（預設行為）|
+| phpmyadmin | `Apache/2.4.x configured -- resuming normal operations` | `Could not reliably determine server's fully qualified domain name` → 正常（不影響）|
+
+**真正的 error 長這樣**（如果看到這些才需要排錯）：
+
+```
+# 連不到 broker（一直重複出現，不只一次）
+ConnectionRefusedError: [Errno 111] Connection refused
+
+# iptables 問題
+iptables: No chain/target/match by that name
+
+# image 架構問題
+exec /docker-entrypoint.sh: exec format error
+
+# celery 找不到
+Failed to spawn: 'celery'
+```
+
+> 💡 **重點**：warning 和 info 可以忽略。只有持續出現的 error 或 container 一直 Restarting 才需要處理。用 `docker compose ps -a` 看有沒有 `Exited` 或 `Restarting` 的服務。
 
 ### Step 6：停止所有服務
 
@@ -527,10 +555,22 @@ docker compose -f docker-compose-mysql.yml up -d
 
 ```bash
 docker compose -f docker-compose-worker.yml up -d
-docker compose -f docker-compose-worker.yml logs -f
 ```
 
 > Worker 用的是 DockerHub 上預先 build 好的 image `enzochang/data_ingestion:latest`，第一次會自動 pull。
+
+✅ **看 log 確認 celery ready**：
+
+```bash
+docker compose -f docker-compose-worker.yml logs -f
+```
+
+看到這行 = worker 正常：
+```
+celery@workerXXXX ready.
+```
+
+如果看到 `Failed to spawn: 'celery'` → 見附錄排錯表。
 
 #### A-5：發送任務 — Producer
 
@@ -538,6 +578,8 @@ docker compose -f docker-compose-worker.yml logs -f
 docker compose -f docker-compose-producer.yml up
 # producer 跑完就結束（送出爬蟲任務）
 ```
+
+> ⚠️ 確認 worker 已經 `ready` 才跑 producer，否則任務會堆在 queue 裡。
 
 #### A-6：在 Flower 看任務執行
 
@@ -643,31 +685,71 @@ volumes:
 | rabbitmq | rabbitmq:3-management | 5672 / 15672 | 訊息佇列 |
 | flower | mher/flower | 5555 | Celery 任務監控 |
 | mysql | mysql:8.0 | 3306 | 資料庫 |
-| phpmyadmin | phpmyadmin/phpmyadmin:5.2 | 8000 | 資料庫管理 |
+| phpmyadmin | phpmyadmin:latest | 8000 | 資料庫管理 |
 | worker | enzochang/data_ingestion | — | 執行爬蟲（Celery Worker）|
 | producer | enzochang/data_ingestion | — | 發送爬蟲任務（一次性）|
 
-#### B-2：一行啟動全部
+#### B-2：啟動 infra + worker
 
 ```bash
 cd ~/de-project
-docker compose up -d
+
+# 先起 infra 4 服務 + worker（不含 producer，producer 要手動發）
+docker compose up -d rabbitmq flower mysql phpmyadmin worker
 ```
 
-> 第一次會 pull 所有 image（約 2-3GB），需要時間。
+> 第一次會 pull 所有 image（約 2-3GB），需要時間。建議課前先 `docker compose pull`。
 
-#### B-3：查看狀態 + web 介面
+#### B-3：確認所有服務正常
 
 ```bash
-docker compose ps
+docker compose ps -a
+# 6 服務中，rabbitmq/flower/mysql/phpmyadmin/worker 應該都是 Up
+# producer 還沒起（等等手動發）
 ```
 
-介面同上：RabbitMQ `:15672`、Flower `:5555`、phpMyAdmin `:8000`
+web 介面：
 
-#### B-4：停止全部
+| 服務 | 網址 | 帳密 |
+|------|------|------|
+| RabbitMQ 管理 | http://localhost:15672 | worker / worker |
+| Flower 監控 | http://localhost:5555 | （無）|
+| phpMyAdmin | http://localhost:8000 | root / 1234 |
+
+✅ **看 worker log 確認 celery ready**：
 
 ```bash
+docker compose logs worker
+```
+
+看到這行 = worker 正常，可以接任務：
+```
+celery@workerXXXX ready.
+```
+
+#### B-4：發送任務 — Producer
+
+確認 worker `ready` 後，發送爬蟲任務：
+
+```bash
+docker compose up producer
+# producer 跑完就自動結束（送出爬蟲任務到 RabbitMQ queue）
+```
+
+> producer 不加 `-d`，讓它在前景跑完才結束，你能直接看到輸出。
+
+#### B-5：在 Flower 看任務執行
+
+回到 http://localhost:5555 → Tasks 頁籤，看 Worker 接到任務並執行。
+
+#### B-6：停止全部
+
+```bash
+docker compose down
+# 停止並移除所有 container + network
+
 docker compose down -v
+# 連 volume（資料庫資料）也一起刪
 ```
 
 ---
@@ -680,6 +762,19 @@ docker compose down -v
 | network | 手動 `docker network create` | 自動建 |
 | 適合 | 教學逐步展示、逐步除錯 | 一鍵部署、快速啟動 |
 | 內容 | 4 個 yaml（broker/mysql/worker/producer）| 1 個 yaml |
+
+### ⚠️ ep03-04 和 de-project 不能同時跑
+
+兩個專案的 container 名稱相同（rabbitmq、mysql、flower、phpmyadmin），**同時跑會衝突**。
+
+```bash
+# 教學流程：先用 ep03-04 學基本 → 拆掉 → 再用 de-project 學完整系統
+cd ~/de-01-projects/de-test/ep03-04
+docker compose down -v          # 先拆 ep03-04
+
+cd ~/de-project
+docker compose up -d            # 再起 de-project
+```
 
 ### ep03-04 vs de-project
 
