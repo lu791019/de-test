@@ -846,19 +846,81 @@ docker volume rm portainer_data
 
 ---
 
-## 附錄：清理與還原
+## 附錄：重 build、檢查、清理
 
-### 清理單一實作
+### 重新 build image
 
 ```bash
+# 一般重 build（用快取，改了 code 才重跑變動的層）
+docker compose -f docker-compose-local.yml up -d --build
+
+# 完全從零 build（不用任何快取，最乾淨最確實，但要 3-5 分鐘）
+docker compose -f docker-compose-local.yml build --no-cache
+docker compose -f docker-compose-local.yml up -d
+
+# 或合一步
+docker compose -f docker-compose-local.yml up -d --build --no-cache
+```
+
+> 💡 分兩步的好處：build 失敗不會試圖啟動壞掉的東西，先確認 build 成功再 up。
+
+### 啟動後檢查（每次 up 完都該跑）
+
+```bash
+# 1. 服務狀態（全部應該 Up，producer 是 Exited(0)）
+docker compose ps -a
+
+# 2. Web 介面（都應該 HTTP 200）
+curl -o /dev/null -w "RabbitMQ: %{http_code}\n" http://localhost:15672
+curl -o /dev/null -w "Flower: %{http_code}\n" http://localhost:5555
+curl -o /dev/null -w "phpMyAdmin: %{http_code}\n" http://localhost:8000
+
+# 3. Logs（看有沒有 error）
+docker compose logs                       # 全部
+docker compose logs worker                # 單一服務
+docker compose logs worker | grep ready   # 找關鍵字
+docker compose logs -f                    # 即時跟蹤（Ctrl+C 離開，不會停服務）
+docker compose logs --tail 20             # 只看最後 20 行
+
+# 4. MySQL 連線
+docker exec mysql mysqladmin ping -uroot -p1234
+# mysqld is alive = OK
+
+# 5. MySQL 查資料（跑完 producer 後）
+docker exec mysql mysql -uroot -p1234 -e "USE hahow; SHOW TABLES;"
+docker exec mysql mysql -uroot -p1234 -e "SELECT COUNT(*) FROM hahow.hahow_course;"
+
+# 6. 進入容器除錯（需要時才用）
+docker exec -it crawler_hahow_worker bash
+```
+
+### 重啟服務
+
+```bash
+# 重啟單一服務
+docker compose restart worker
+
+# 重啟全部
+docker compose restart
+
+# 完全拆掉重來（刪 container + network，保留 image）
+docker compose down
+docker compose up -d
+
+# 完全拆掉 + 刪 volume（資料庫資料也清掉）
+docker compose down -v
+docker compose up -d
+```
+
+### 清理
+
+```bash
+# 清理單一實作
 docker compose down -v          # 停 compose 服務 + 刪 volume
 docker rm -f <container>         # 刪 container
 docker rmi <image>              # 刪 image
-```
 
-### 全部清乾淨（謹慎）
-
-```bash
+# 全部清乾淨（謹慎）
 docker ps -aq | xargs -r docker rm -f     # 刪所有 container
 docker system prune -a --volumes          # 刪所有未使用 image/network/volume
 ```
