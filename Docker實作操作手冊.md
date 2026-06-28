@@ -25,16 +25,16 @@ docker run hello-world    # 看到 Hello from Docker!
 ## 目錄
 
 - [第一部分：Docker 基本操作](#第一部分docker-基本操作)
-- [第二部分：Dockerfile 實作（FastAPI 範例）](#第二部分dockerfile-實作fastapi-範例)
+- [第二部分：Dockerfile 實作 FastAPI](#第二部分dockerfile-實作-fastapi)
 - [第三部分：de-test 真實專案 Dockerfile](#第三部分de-test-真實專案-dockerfile)
-- [第四部分：Docker Compose — de-test/ep03-04（4 服務 infra）](#第四部分docker-compose--de-testep03-044-服務-infra)
-- [第五部分：de-project-course 前置（共用）](#第五部分de-project-course-前置共用)
-- [第六部分：de-project-course 分開版（逐步加服務）](#第六部分de-project-course-分開版逐步加服務)
-- [第七部分：de-project-course 整合版 A（DockerHub image）](#第七部分de-project-course-整合版-adockerhub-image)
-- [第八部分：de-project-course 整合版 B（本地 build）](#第八部分de-project-course-整合版-b本地-build)
+- [第四部分：ep03-04 Docker Compose](#第四部分ep03-04-docker-compose)
+- [第五部分：de-project-course 前置](#第五部分de-project-course-前置)
+- [第六部分：de-project-course 分開版](#第六部分de-project-course-分開版)
+- [第七部分：de-project-course 整合版 A](#第七部分de-project-course-整合版-a)
+- [第八部分：de-project-course 整合版 B](#第八部分de-project-course-整合版-b)
 - [第九部分：DockerHub 分享 image](#第九部分dockerhub-分享-image)
 - [第十部分：Portainer 圖形化管理](#第十部分portainer-圖形化管理)
-- [附錄：重 build、檢查、清理](#附錄重-build檢查清理)
+- [附錄：重 build 檢查 清理](#附錄重-build-檢查-清理)
 
 ---
 
@@ -119,7 +119,7 @@ docker system prune             # 清理未使用資源
 
 ---
 
-## 第二部分：Dockerfile 實作（FastAPI 範例）
+## 第二部分：Dockerfile 實作 FastAPI
 
 從零寫一個 Dockerfile，把一個 FastAPI 小程式打包成 image。
 
@@ -325,7 +325,7 @@ docker ps -a    # 看到剛才的 test-app container（Exited）
 
 ---
 
-## 第四部分：Docker Compose — de-test/ep03-04（4 服務 infra）
+## 第四部分：ep03-04 Docker Compose
 
 de-test 的 `ep03-04/docker-compose.yml` 只包含 **4 個基礎服務**（不含 worker/producer）。適合教 Compose 基本概念。
 
@@ -482,7 +482,7 @@ docker compose down -v
 
 ---
 
-## 第五部分：de-project-course 前置（共用）
+## 第五部分：de-project-course 前置
 
 de-project-course 是**真實的資料工程專案**，比 ep03-04 多了 **worker**（執行爬蟲）和 **producer**（發送任務）。有三種操作方式（分開版 / 整合版 A / 整合版 B），以下前置步驟三種都要先做。
 
@@ -554,7 +554,7 @@ docker compose up -d            # 再起 de-project-course
 
 ---
 
-## 第六部分：de-project-course 分開版（逐步加服務）
+## 第六部分：de-project-course 分開版
 
 > 前提：已完成第五部分的 `git clone`。
 
@@ -659,7 +659,7 @@ docker network rm my_network
 
 ---
 
-## 第七部分：de-project-course 整合版 A（DockerHub image）
+## 第七部分：de-project-course 整合版 A
 
 > 前提：已完成第五部分的 `git clone`。
 
@@ -725,7 +725,7 @@ docker compose down -v    # 含刪 volume
 
 ---
 
-## 第八部分：de-project-course 整合版 B（本地 build）
+## 第八部分：de-project-course 整合版 B
 
 > 前提：已完成第五部分的 `git clone`。
 
@@ -890,7 +890,7 @@ docker volume rm portainer_data
 
 ---
 
-## 附錄：重 build、檢查、清理
+## 附錄：重 build 檢查 清理
 
 ### 重新 build image
 
