@@ -557,10 +557,6 @@ ls
 | network | 手動建 `my_network` | 自動 | 自動 |
 | 適合 | 教學逐步展示 | 學生快速用 | 老師 Mac / 備用 |
 
-### ⚠️ ep03-04 和 hahow-crawler 不能同時跑
-
-兩個專案的 container 名稱相同（rabbitmq、mysql、flower、phpmyadmin），**同時跑會衝突**。
-
 ```bash
 # 教學流程：先用 ep03-04 學基本 → 拆掉 → 再用 hahow-crawler
 cd ~/de-01-projects/de-course/ep03-04
@@ -569,16 +565,6 @@ docker compose down -v          # 先拆 ep03-04
 cd ~/hahow-crawler
 docker compose up -d            # 再起 hahow-crawler
 ```
-
-### ep03-04 vs hahow-crawler
-
-| | ep03-04 | hahow-crawler |
-|---|---|---|
-| repo | [de-course](https://github.com/lu791019/de-course)（教學用）| [hahow-crawler](https://github.com/lu791019/hahow-crawler-de-course-materials)（課程版）|
-| 服務數 | 4 個（infra only）| 6 個（infra + worker + producer）|
-| compose 方式 | 只有整合版 | 分開版 + 整合版 A + 整合版 B |
-| worker/producer | 沒有 | 有 |
-| 用途 | 學 compose 基本概念 | 學完整資料工程系統 |
 
 ---
 
