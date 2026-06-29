@@ -74,9 +74,9 @@ docker compose up -d        # 起 4 個 infra 服務
 docker compose ps           # 確認全部 running
 docker compose down         # 停止
 ```
-| [Docker 安裝手冊](Docker安裝教學手冊.md) | Docker Engine 安裝 + FAQ 26 題 + 課前預載 | 安裝 Docker 時 |
-| [Docker 操作手冊](Docker_Compose開發操作手冊.md) | Daemon + Nginx 部署 + Port + Restart + Compose | Docker 日常操作 |
-| [Docker 實作手冊](Docker實作手冊.md) | Dockerfile → Compose 多服務 → DockerHub → Portainer | Docker 實作課 |
+1. 安裝 Docker - Docker Engine 安裝 + FAQ 26 題 + 課前預載： [Docker 安裝手冊](Docker安裝教學手冊.md) 
+2. Docker 日常操作 - Docker Daemon + Nginx 部署 + Port 說明 + Docker Compose ：  [Docker 操作手冊](Docker_Compose開發操作手冊.md)
+3. Docker 實作練習 - Dockerfile → Compose 多服務 → DockerHub → Portainer：[Docker 實作手冊](Docker實作手冊.md) 
 
 
 ## 專案結構
